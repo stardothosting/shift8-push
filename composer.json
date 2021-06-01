@@ -1,0 +1,15 @@
+{
+    "name": "shift8web/shift8-push",
+    "description": "This is a Wordpress plugin that pushes a single post or page to an external site via the REST API",
+    "type": "wordpress-plugin",
+    "license": "GPLv3",
+    "authors": [
+        {
+            "name": "stardothosting",
+            "email": "admin@stardothosting.com"
+        }
+    ],
+    "require": {
+        "nesbot/carbon": "^2.40"
+    }
+}
