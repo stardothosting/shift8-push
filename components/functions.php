@@ -50,11 +50,12 @@ add_action( 'wp_ajax_shift8_push_push', 'shift8_push_push' );
 function shift8_push_push() {
     // Test
     if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'check') {
-        shift8_push_poll('check');
+        shift8_push_poll('check', null);
         die();
-    // Manual import of webinars from Zoom
-    } else if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'import') {
-        shift8_push_poll('import');
+    // Push 
+    } else if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'push' && is_numeric($_GET['item_id'])) {
+        $item_id = $_GET['item_id'];
+        shift8_push_poll('push', $item_id);
         die();
     } else {
         die();
@@ -62,7 +63,7 @@ function shift8_push_push() {
 }
 
 // Handle the actual GET
-function shift8_push_poll($shift8_action) {
+function shift8_push_poll($shift8_action, $item_id = null) {
     if (current_user_can('administrator')) {
         global $wpdb;
         $current_user = wp_get_current_user();
@@ -75,10 +76,11 @@ function shift8_push_poll($shift8_action) {
             'Content-type: application/json',
             'Authorization' => 'Basic ' . $application_password,
         );
+
         // Check values with dashboard
         if ($shift8_action == 'check') {
             // Use WP Remote Get to poll the zoom api 
-            $response = wp_remote_get( $destination_url . '/wp-json/wp/v2/' ,
+            $response = wp_remote_get( $destination_url . S8PUSH_APIBASE ,
                 array(
                     'method' => 'GET',
                     'headers' => $headers,
@@ -105,9 +107,63 @@ function shift8_push_poll($shift8_action) {
                     echo 'unknown';
                 }
             } 
-        } else if ($shift8_action == 'import') {
+        } else if ($shift8_action == 'push') {
+
+
+
+            // Assign the post type based on item ID provided
+            $post_type = null;
+            if ( $item_id && get_post_type( $item_id ) == 'post' ) $post_type = 'posts';
+            if ( $item_id && get_post_type( $item_id ) == 'page' ) $post_type = 'pages';
+
+            // Only continue if we are dealing with posts or pages
+            if ($post_type) {
+
+                // Load up the post data
+                $post_data = get_post($item_id);
+
+                // Check if post exists
+                $check_exists = wp_remote_get( $destination_url . S8PUSH_APIBASE . $post_type . '?slug=' . $post_data->post_name,
+                    array(
+                        'method' => 'GET',
+                        'headers' => $headers,
+                        'httpversion' => '1.1',
+                        'timeout' => '45',
+                        'blocking' => true,
+                    )
+                );
+
+                $check_object = json_decode($check_exists['body']);
+
+                // If we found an existing post with slug match
+                if (count($check_object) > 0) {
+                    $destination_id = $check_object[0]->id;
+                    // Populate options from response if its a check   
+                    //$check_data = json_decode($check_exists['body'], true);
+                    //$webinars_imported = shift8_push_import_webinars($webinar_data);
+                    echo json_encode(array(
+                        'destination_id' => esc_attr($destination_id),
+                    ));
+                // IF nothing found, create new post on destination
+                } else {
+                    echo 'Error Detected : ';
+                    if (is_array($check_exists['response'])) {
+                        echo esc_attr(json_decode($check_exists['body'])->error);
+
+                    } else {
+                        echo 'unknown';
+                    }
+                }
+
+            }
+
+
+            // Match via clean url
+            // If doesnt exist, create
+
+            // If exists, update
             // Use WP Remote Get to poll the zoom api 
-            $response = wp_remote_get( S8ZOOM_API . '/v2/users/' . $zoom_user_email . '/webinars' . S8ZOOM_WEBINAR_PARAMETERS,
+            /*$response = wp_remote_post( $destination_url . '/v2/users/' . $zoom_user_email . '/webinars' . S8ZOOM_WEBINAR_PARAMETERS,
                 array(
                     'method' => 'GET',
                     'headers' => $headers,
@@ -115,29 +171,7 @@ function shift8_push_poll($shift8_action) {
                     'timeout' => '45',
                     'blocking' => true,
                 )
-            );
-            // Deal with the response
-            if (is_object(json_decode($response['body']))) {
-                // Populate options from response if its a check
-                if ($shift8_action == 'import') {         
-                    $webinar_data = json_decode($response['body'], true);
-                    $webinars_imported = shift8_push_import_webinars($webinar_data);
-                    echo json_encode(array(
-                        'total_records' => esc_attr(json_decode($response['body'])->total_records),
-                        'webinar_data' => json_encode(json_decode($response['body'])->webinars),
-                        'webinars_imported' => $webinars_imported,
-                    ));   
-                }
-
-            } else {
-                echo 'Error Detected : ';
-                if (is_array($response['response'])) {
-                    echo esc_attr(json_decode($response['body'])->error);
-
-                } else {
-                    echo 'unknown';
-                }
-            }
+            );*/
         }
     } 
 }
@@ -387,54 +421,3 @@ function shift8_push_import_webinars($webinar_data) {
     return $import_count;
 }
 
-// Get the agenda info because it is truncated in the agenda list API query
-function shift8_push_webinar_data($webinar_id) {
-    $zoom_jwt_token = shift8_push_generate_jwt();
-
-     // Set headers for WP Remote post
-    $headers = array(
-        'Content-type: application/json',
-        'Authorization' => 'Bearer ' . $zoom_jwt_token,
-    );
-
-    // Use WP Remote Get to poll the zoom api 
-    $response = wp_remote_get( S8ZOOM_API . '/v2/webinars/' . intval($webinar_id),
-        array(
-            'method' => 'GET',
-            'headers' => $headers,
-            'httpversion' => '1.1',
-            'timeout' => '45',
-            'blocking' => true,
-        )
-    );
-    // Deal with the response
-    if (is_object(json_decode($response['body']))) {
-        // Pass the returned webinars to a function to handle the import
-        return array(
-            'agenda' => shift8_push_wp_kses(json_decode($response['body'])->agenda),
-            'registration_url' => sanitize_url(json_decode($response['body'])->registration_url),
-        );
-
-    } else {
-        return false;
-    }
-}
-
-// Centralized function to filter HTML, specifically for the agenda details
-function shift8_push_wp_kses($string) {
-    $allowed_html = array(
-        'a' => array(
-            'href' => array(),
-            'title' => array()
-        ),
-        'br' => array(),
-        'em' => array(),
-        'strong' => array(),
-        'ul' => array(),
-        'li' => array(),
-        'ol' => array(),
-        'b' => array(),
-        'p' => array(),
-    );
-    return wp_kses($string, $allowed_html);
-}

@@ -6,6 +6,7 @@ jQuery(document).ready(function() {
         e.preventDefault();
         var button = jQuery(this);
         var url = button.attr('href');
+
         jQuery.ajax({
             url: url,
             dataType: 'json',
@@ -30,21 +31,26 @@ jQuery(document).ready(function() {
     });
 
     // Manually import webinars
-    jQuery(document).on( 'click', '#shift8-push-import', function(e) {
+    jQuery(document).on( 'click', '#shift8-push-trigger', function(e) {
         jQuery(".shift8-push-spinner").show();
         e.preventDefault();
         var button = jQuery(this);
         var url = button.attr('href');
+        const urlSearchParams = new URLSearchParams(url);
+        const params = Object.fromEntries(urlSearchParams.entries());
+
         jQuery.ajax({
             url: url,
-            dataType: 'json',
+            //dataType: 'json',
             data: {
                 'action': 'shift8_push_push',
-                'type': 'import'
+                'type': 'push',
+                'item_id': params.item_id,
             },
             success:function(data) {
                 // This outputs the result of the ajax request
-                jQuery('.shift8-push-response').html('Zoom import successful. Total webinars polled : ' + data.total_records + ' Total new webinars imported : ' + data.webinars_imported).fadeIn();
+                console.log('Response : ' + JSON.stringify(data, null,2));
+                jQuery('.shift8-push-response').html('Push successful!').fadeIn();
                 setTimeout(function(){ jQuery('.shift8-push-response').fadeOut() }, 25000);
                 jQuery(".shift8-push-spinner").hide();               
             },
@@ -55,7 +61,6 @@ jQuery(document).ready(function() {
                 jQuery(".shift8-push-spinner").hide();
             }
         });
-
     });
 });
 
