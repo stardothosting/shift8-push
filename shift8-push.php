@@ -64,8 +64,6 @@ $plugin_name = $plugin_data['TextDomain'];
     <tbody class="<?php echo $active_tab == 'core_settings' ? 'shift8-push-admin-tab-active' : 'shift8-push-admin-tab-inactive'; ?>">
 	<tr valign="top">
     <th scope="row">Core Settings</th>
-    <?php var_dump(base64_encode('administrator:' .  shift8_push_decrypt(get_option('shift8_push_application_password')))); 
-    var_dump(shift8_push_decrypt(get_option('shift8_push_application_password'))); ?>
     <td><span id="shift8-push-notice">
     <?php 
     settings_errors('shift8_push_url');

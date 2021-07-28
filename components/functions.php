@@ -121,6 +121,37 @@ function shift8_push_poll($shift8_action, $item_id = null) {
 
                 // Load up the post data
                 $post_data = get_post($item_id);
+                $post_meta = get_post_meta($item_id);
+                if( $post_data ) {
+                    // Now, form our own array
+                    $data = array();
+                    $meta_data = array();
+                    $data['date'] = $post_data->post_date;
+                    $data['date_gmt'] = $post_data->post_date_gmt;
+                    $data['guid'] = $post_data->guid;
+                    $data['modified'] = $post_data->post_modified;
+                    $data['modified_gmt'] = $post_data->post_modified_gmt;
+                    $data['slug'] = $post_data->post_name;
+                    $data['status'] = $post_data->post_status;
+                    $data['title'] = $post_data->post_title;
+                    $data['content'] = $post_data->post_content;
+                    $data['excerpt'] = $post_data->post_excerpt;
+                    if ($post_meta && is_array($post_meta)) {
+                        foreach ($post_meta as $key => $value) {
+                            $data[$key] = $value;
+                        }
+                    }
+                    $data['meta'] = array(
+                        'fl_builder_history_position' => 0,
+                    );
+                    $data['fl_builder_history_position'] = 0;
+                    //$data['_fl_builder_history_position'] = $post_meta['_fl_builder_history_position'];
+                    //$data['_fl_builder_draft'] = $post_meta['_fl_builder_draft'];
+                    //$data['_fl_builder_data'] = $post_meta['_fl_builder_data'];
+                    //$data['_fl_builder_data_settings'] = $post_meta['_fl_builder_data_settings'];
+                    //$data['_fl_builder_enabled'] = $post_meta['_fl_builder_enabled'];
+                    //$data['_fl_builder_history_state_0'] = $post_meta['_fl_builder_history_state_0'];
+                }
 
                 // Check if post exists
                 $check_exists = wp_remote_get( $destination_url . S8PUSH_APIBASE . $post_type . '?slug=' . $post_data->post_name,
@@ -137,29 +168,47 @@ function shift8_push_poll($shift8_action, $item_id = null) {
 
                 // If we found an existing post with slug match
                 if (count($check_object) > 0) {
-                    $destination_id = $check_object[0]->id;
-                    // Populate options from response if its a check   
-                    //$check_data = json_decode($check_exists['body'], true);
-                    //$webinars_imported = shift8_push_import_webinars($webinar_data);
-                    echo json_encode(array(
-                        'destination_id' => esc_attr($destination_id),
-                    ));
+                    $destination_id = esc_attr($check_object[0]->id);
+                    //echo json_encode(array(
+                    //    'destination_id' => esc_attr($destination_id),
+                    //));
+                    $api_response = wp_remote_post( $destination_url . S8PUSH_APIBASE . $post_type . '/' . $destination_id . '/',
+                        array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $data,
+                            'data_format' => 'body',
+                        )
+                    );
+                    $body = json_decode( $api_response['body'] );
+
+                    if( wp_remote_retrieve_response_message( $api_response ) === 'OK' ) {
+                        echo json_encode(array(
+                            'message' => 'The post ' . $body->title->rendered . ' has been updated successfully',
+                            'post_data' => print_r($data['meta']),
+                        ));
+                    } else {
+                        echo json_encode(array(
+                            'message' => print_r($api_response,true),
+                            'post_data' => print_r($data['meta']),
+                        ));
+                    }
+
                 // IF nothing found, create new post on destination
                 } else {
-                    echo 'Error Detected : ';
+                    /*echo 'Error Detected : ';
                     if (is_array($check_exists['response'])) {
                         echo esc_attr(json_decode($check_exists['body'])->error);
 
                     } else {
                         echo 'unknown';
-                    }
+                    }*/
                 }
 
             }
-
-
-            // Match via clean url
-            // If doesnt exist, create
 
             // If exists, update
             // Use WP Remote Get to poll the zoom api 
@@ -421,3 +470,43 @@ function shift8_push_import_webinars($webinar_data) {
     return $import_count;
 }
 
+// Allow all meta fields to be updated via REST API
+add_action( 'rest_api_init', 'shift8_push_create_api_posts_meta_field' );
+
+function shift8_push_create_api_posts_meta_field() {
+    $page_meta_keys = shift8_push_generate_meta_keys('page');
+    $post_meta_keys = shift8_push_generate_meta_keys('post');
+    foreach ($page_meta_keys as $page_meta_key) {
+        register_rest_field( 'page', $page_meta_key, array(
+            'update_callback' => 'shift8_push_update_post_meta_for_api',
+            )
+        );
+    }
+    foreach ($post_meta_keys as $post_meta_key) {
+        register_rest_field( 'post', $post_meta_key, array(
+            'update_callback' => 'shift8_push_update_post_meta_for_api',
+            )
+        );
+    }
+}
+
+function shift8_push_update_post_meta_for_api( $value, $object, $field_name ) {
+    if ( ! $value ) {
+        return;
+    }
+    return update_post_meta( $object->ID, $field_name, $value );
+}
+
+function shift8_push_generate_meta_keys($post_type){
+    global $wpdb;
+    $query = "
+        SELECT DISTINCT($wpdb->postmeta.meta_key) 
+        FROM $wpdb->posts 
+        LEFT JOIN $wpdb->postmeta 
+        ON $wpdb->posts.ID = $wpdb->postmeta.post_id 
+        WHERE $wpdb->posts.post_type = '%s' 
+        AND $wpdb->postmeta.meta_key != '' 
+    ";
+    $meta_keys = $wpdb->get_col($wpdb->prepare($query, esc_attr($post_type)));
+    return $meta_keys;
+}
