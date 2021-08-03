@@ -70,6 +70,7 @@ function shift8_push_poll($shift8_action, $item_id = null) {
 
         $application_password = base64_encode('admin:' . shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password'))));
         $destination_url = esc_attr(get_option('shift8_push_dst_url'));
+        $source_url = esc_attr(get_option('shift8_push_src_url'));
 
         // Set headers for WP Remote post
         $headers = array(
@@ -134,23 +135,17 @@ function shift8_push_poll($shift8_action, $item_id = null) {
                     $data['slug'] = $post_data->post_name;
                     $data['status'] = $post_data->post_status;
                     $data['title'] = $post_data->post_title;
-                    $data['content'] = $post_data->post_content;
+                    $data['content'] = str_replace($source_url, $destination_url, $post_data->post_content);
                     $data['excerpt'] = $post_data->post_excerpt;
-                    if ($post_meta && is_array($post_meta)) {
-                        foreach ($post_meta as $key => $value) {
-                            $data[$key] = $value;
-                        }
-                    }
-                    $data['meta'] = array(
-                        'fl_builder_history_position' => 0,
-                    );
-                    $data['fl_builder_history_position'] = 0;
-                    //$data['_fl_builder_history_position'] = $post_meta['_fl_builder_history_position'];
-                    //$data['_fl_builder_draft'] = $post_meta['_fl_builder_draft'];
-                    //$data['_fl_builder_data'] = $post_meta['_fl_builder_data'];
-                    //$data['_fl_builder_data_settings'] = $post_meta['_fl_builder_data_settings'];
-                    //$data['_fl_builder_enabled'] = $post_meta['_fl_builder_enabled'];
-                    //$data['_fl_builder_history_state_0'] = $post_meta['_fl_builder_history_state_0'];
+                    $data['_fl_builder_data'] = unserialize(str_replace($source_url, $destination_url, $post_meta['_fl_builder_data']));
+                    //$data['_fl_builder_data_settings'] = str_replace($source_url, $destination_url, $post_meta['_fl_builder_data_settings']);
+                    //$data['_fl_builder_enabled'] = str_replace($source_url, $destination_url, $post_meta['_fl_builder_enabled']);
+
+                    //if ($post_meta && is_array($post_meta)) {
+                    //    foreach ($post_meta as $key => $value) {
+                    //        $data[$key] = str_replace($source_url, $destination_url, $value);
+                    //    }
+                    //}
                 }
 
                 // Check if post exists
@@ -188,12 +183,12 @@ function shift8_push_poll($shift8_action, $item_id = null) {
                     if( wp_remote_retrieve_response_message( $api_response ) === 'OK' ) {
                         echo json_encode(array(
                             'message' => 'The post ' . $body->title->rendered . ' has been updated successfully',
-                            'post_data' => print_r($data['meta']),
+                            'post_data' => print_r($data['_fl_builder_data']),
                         ));
                     } else {
                         echo json_encode(array(
                             'message' => print_r($api_response,true),
-                            'post_data' => print_r($data['meta']),
+                            'post_data' => print_r($data['_fl_builder_data']),
                         ));
                     }
 
@@ -226,6 +221,34 @@ function shift8_push_poll($shift8_action, $item_id = null) {
 }
 
 
+// TESTING
+/*
+$post_data = get_post(5922);
+$post_meta = get_post_meta(5922);
+$data = array();
+$meta_data = array();
+$data['date'] = $post_data->post_date;
+$data['date_gmt'] = $post_data->post_date_gmt;
+$data['guid'] = $post_data->guid;
+$data['modified'] = $post_data->post_modified;
+$data['modified_gmt'] = $post_data->post_modified_gmt;
+$data['slug'] = $post_data->post_name;
+$data['status'] = $post_data->post_status;
+$data['title'] = $post_data->post_title;
+$data['content'] = str_replace($source_url, $destination_url, $post_data->post_content);
+$data['excerpt'] = $post_data->post_excerpt;
+//$data['_fl_builder_data'] = unserialize(str_replace($source_url, $destination_url, $post_meta['_fl_builder_data']));
+$data['_fl_builder_data'] = serialize($post_meta['_fl_builder_data']);
+
+
+ini_set("xdebug.var_display_max_children", '-1');
+ini_set("xdebug.var_display_max_data", '-1');
+ini_set("xdebug.var_display_max_depth", '-1');
+echo '<pre>';
+var_dump(unserialize($data['_fl_builder_data']));
+echo '</pre>';
+exit(0);
+die();*/
 
 // Functions to produce debugging information
 function shift8_push_debug_get_php_info() {
@@ -505,8 +528,35 @@ function shift8_push_generate_meta_keys($post_type){
         LEFT JOIN $wpdb->postmeta 
         ON $wpdb->posts.ID = $wpdb->postmeta.post_id 
         WHERE $wpdb->posts.post_type = '%s' 
-        AND $wpdb->postmeta.meta_key != '' 
+        AND $wpdb->postmeta.meta_key != '_fl_builder_history_position' 
     ";
     $meta_keys = $wpdb->get_col($wpdb->prepare($query, esc_attr($post_type)));
     return $meta_keys;
+}
+
+// Create custom REST endpoint for dealing with meta values
+add_action( 'rest_api_init', function () {
+        register_rest_route( 'shift8/v1', '/meta/', array(
+                'methods' => 'POST',
+                'callback' => 'shfit8_push_rest_meta'
+        ) );
+} );
+
+function shift8_push_rest_meta( $request ) {
+    $post_data['id'] = $request['id'];
+    $post_data['key'] = $request['key'];
+    $post_data['value'] = $request['value'];
+    $update_response = update_post_meta($post_data['id'], $post_data['key'], unserialize($post_data['value']));
+    if ($update_response) {
+        $response = array(
+            'update_response' => $update_response,
+            'message' => 'Post meta updated for ID ' . $post_data['id'],
+        );
+    } else {
+        $response = array(
+            'update_response' => $update_response,
+            'message' => 'Post meta update failed for ID ' . $post_data['id'],
+        );
+    }
+    return $response;
 }
