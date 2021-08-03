@@ -137,15 +137,15 @@ function shift8_push_poll($shift8_action, $item_id = null) {
                     $data['title'] = $post_data->post_title;
                     $data['content'] = str_replace($source_url, $destination_url, $post_data->post_content);
                     $data['excerpt'] = $post_data->post_excerpt;
-                    $data['_fl_builder_data'] = unserialize(str_replace($source_url, $destination_url, $post_meta['_fl_builder_data']));
+                    //$data['_fl_builder_data'] = unserialize(str_replace($source_url, $destination_url, $post_meta['_fl_builder_data']));
                     //$data['_fl_builder_data_settings'] = str_replace($source_url, $destination_url, $post_meta['_fl_builder_data_settings']);
                     //$data['_fl_builder_enabled'] = str_replace($source_url, $destination_url, $post_meta['_fl_builder_enabled']);
-
-                    //if ($post_meta && is_array($post_meta)) {
-                    //    foreach ($post_meta as $key => $value) {
-                    //        $data[$key] = str_replace($source_url, $destination_url, $value);
-                    //    }
-                    //}
+                    if ($post_meta && is_array($post_meta)) {
+                        foreach ($post_meta as $key => $value) {
+                            //$meta_data[$key] = str_replace($source_url, $destination_url, $value);
+                            $meta_data['meta'][$key] = $value[0];
+                        }
+                    }
                 }
 
                 // Check if post exists
@@ -181,10 +181,27 @@ function shift8_push_poll($shift8_action, $item_id = null) {
                     $body = json_decode( $api_response['body'] );
 
                     if( wp_remote_retrieve_response_message( $api_response ) === 'OK' ) {
-                        echo json_encode(array(
+                        /*echo json_encode(array(
                             'message' => 'The post ' . $body->title->rendered . ' has been updated successfully',
                             'post_data' => print_r($data['_fl_builder_data']),
-                        ));
+                        ));*/
+                        $meta_data['id'] = $destination_id;
+                        $meta_api_response = wp_remote_post( $destination_url . S8PUSH_APICUSTOM . 'meta/',                       array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $meta_data,
+                            'data_format' => 'body',
+                            )
+                        );
+                       $meta_body = json_decode( $meta_api_response['body'] );
+                       echo $meta_api_response['body'];
+                       /*echo json_encode(array(
+                            'message' => 'The post ' . $body->title->rendered . ' has been updated successfully',
+                            'post_data' => print_r($meta_body),
+                        ));*/
                     } else {
                         echo json_encode(array(
                             'message' => print_r($api_response,true),
@@ -222,7 +239,6 @@ function shift8_push_poll($shift8_action, $item_id = null) {
 
 
 // TESTING
-/*
 $post_data = get_post(5922);
 $post_meta = get_post_meta(5922);
 $data = array();
@@ -237,18 +253,46 @@ $data['status'] = $post_data->post_status;
 $data['title'] = $post_data->post_title;
 $data['content'] = str_replace($source_url, $destination_url, $post_data->post_content);
 $data['excerpt'] = $post_data->post_excerpt;
-//$data['_fl_builder_data'] = unserialize(str_replace($source_url, $destination_url, $post_meta['_fl_builder_data']));
-$data['_fl_builder_data'] = serialize($post_meta['_fl_builder_data']);
+$meta_data['id'] = 5925;
+if ($post_meta && is_array($post_meta)) {
+    foreach ($post_meta as $key => $value) {
+        if (strpos($key, '_fl_') !== false) {
+        //$meta_data[$key] = str_replace($source_url, $destination_url, $value);
+            $meta_data['meta'][$key] = $value[0];
+        }
+    }
+}
 
+$application_password = base64_encode('admin:ZnL0 0tCB NRNS lsHq vhzj fL4M');
+$destination_url = esc_attr(get_option('shift8_push_dst_url'));
+$source_url = esc_attr(get_option('shift8_push_src_url'));
+
+// Set headers for WP Remote post
+$headers = array(
+    'Content-type: application/json',
+    'Authorization' => 'Basic ' . $application_password,
+);
+$meta_api_response = wp_remote_post( $destination_url . S8PUSH_APICUSTOM . 'meta/',                       array(
+    'method' => 'POST',
+    'headers' => $headers,
+    'httpversion' => '1.1',
+    'timeout' => '45',
+    'blocking' => true,
+    'body' => $meta_data,
+    'data_format' => 'body',
+    )
+);
+$meta_body = json_decode( $meta_api_response['body'] );
 
 ini_set("xdebug.var_display_max_children", '-1');
 ini_set("xdebug.var_display_max_data", '-1');
 ini_set("xdebug.var_display_max_depth", '-1');
 echo '<pre>';
-var_dump(unserialize($data['_fl_builder_data']));
+var_dump($meta_body);
+//var_dump($meta_api_response['body']);
 echo '</pre>';
 exit(0);
-die();*/
+die();
 
 // Functions to produce debugging information
 function shift8_push_debug_get_php_info() {

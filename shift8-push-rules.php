@@ -17,3 +17,6 @@ if ( !defined( 'S8PUSH_DIR' ) )
 
 if ( !defined( 'S8PUSH_APIBASE' ) )
     define( 'S8PUSH_APIBASE', '/wp-json/wp/v2/' );
+
+if ( !defined( 'S8PUSH_APICUSTOM' ) )
+    define ( 'S8PUSH_APICUSTOM', '/wp-json/shift8/v1/' );
