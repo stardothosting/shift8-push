@@ -145,7 +145,7 @@ $plugin_name = $plugin_data['TextDomain'];
     <strong>Debug Info</strong><br /><br />
     Providing the debug information below to the Shift8 zoom support team may be helpful in them assisting in diagnosing any issues you may be having. <br /><br />
     <div class="shift8-push-button-container">
-    </div><button class="shift8-push-button shift8-push-button-copyclipboard" id="button1" onclick="Shift8ZoomCopyToClipboard('shift8zoom-debug')">Copy info below to clipboard</button>
+    </div><button class="shift8-push-button shift8-push-button-copyclipboard" id="button1" onclick="Shift8PushCopyToClipboard('shift8push-debug')">Copy info below to clipboard</button>
     <br /><br />
     <script type="text/javascript">
         function showDetails(id) {

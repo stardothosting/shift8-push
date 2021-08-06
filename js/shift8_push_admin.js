@@ -27,7 +27,6 @@ jQuery(document).ready(function() {
                 jQuery(".shift8-push-spinner").hide();
             }
         });
-        alert(JSON.stringify(data)); 
     });
 
     // Manually import webinars
@@ -65,7 +64,7 @@ jQuery(document).ready(function() {
 });
 
 
-function Shift8ZoomCopyToClipboard(containerid) {
+function Shift8PushCopyToClipboard(containerid) {
     if (document.selection) { 
         var range = document.body.createTextRange();
         range.moveToElementText(document.getElementById(containerid));
