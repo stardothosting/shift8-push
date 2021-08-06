@@ -68,7 +68,7 @@ function shift8_push_poll($shift8_action, $item_id = null) {
         global $wpdb;
         $current_user = wp_get_current_user();
 
-        $application_password = base64_encode('admin:' . shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password'))));
+        $application_password = base64_encode(esc_attr(get_option('shift8_push_application_user')) . ':' . shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password'))));
         $destination_url = esc_attr(get_option('shift8_push_dst_url'));
         $source_url = esc_attr(get_option('shift8_push_src_url'));
 
@@ -117,7 +117,7 @@ function shift8_push_poll($shift8_action, $item_id = null) {
             if ( $item_id && get_post_type( $item_id ) == 'post' ) $post_type = 'posts';
             if ( $item_id && get_post_type( $item_id ) == 'page' ) $post_type = 'pages';
             if ( $item_id && get_post_type( $item_id ) == 'traffick-stop' ) $post_type = 'traffick-stop';
-            
+
             // Only continue if we are dealing with posts or pages
             if ($post_type) {
 

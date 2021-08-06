@@ -107,6 +107,14 @@ $plugin_name = $plugin_data['TextDomain'];
     </div>
     </td>
     </tr>
+    <tr valign="top">
+    <th scope="row">Shift8 Push Application User : </th>
+    <td><input type="text" id="shift8_push_application_user" name="shift8_push_application_user" size="34" value="<?php echo (empty(esc_attr(get_option('shift8_push_application_user'))) ? '' : esc_attr(get_option('shift8_push_application_user'))); ?>">
+    <div class="shift8-push-tooltip"><span class="dashicons dashicons-editor-help"></span>
+        <span class="shift8-push-tooltiptext">This is the user that the application password belongs, generated on the production site.</span>
+    </div>
+    </td>
+    </tr>
 	<tr valign="top">
     <th scope="row">Shift8 Push Application Password : </th>
     <td><input type="password" id="shift8_push_application_password" name="shift8_push_application_password" size="34" value="<?php echo (empty(esc_attr(get_option('shift8_push_application_password'))) ? '' : shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password')))); ?>">
@@ -118,11 +126,11 @@ $plugin_name = $plugin_data['TextDomain'];
     <tr valign="top">
     <td width="226px"><div class="shift8-push-spinner"></div></td>
     <td>
-    <?php if (empty(esc_attr(get_option('shift8_push_application_password')))) { ?>
-    <div class="shift8-push-prereg-note">Note : You need to register an application password from the production site first to get the above values. Once you save the application password, a check button will appear.</div>
+    <?php if (empty(esc_attr(get_option('shift8_push_application_password'))) || empty(esc_attr(get_option('shift8_push_application_user'))) ) { ?>
+    <div class="shift8-push-prereg-note">Note : You need to register an application password for your user from the production site first to get the above values. Once you save the application password, a check button will appear.</div>
     <?php } ?>
     <ul class="shift8-push-controls">
-    <?php if (!empty(esc_attr(get_option('shift8_push_application_password')))) { ?>
+    <?php if (!empty(esc_attr(get_option('shift8_push_application_password'))) && !empty(esc_attr(get_option('shift8_push_application_user')))) { ?>
     <li>
     <div class="shift8-push-button-container">
     <a id="shift8-push-check" href="<?php echo wp_nonce_url( admin_url('admin-ajax.php?action=shift8_push_push'), 'process'); ?>"><button class="shift8-push-button shift8-push-button-check">Test</button></a>

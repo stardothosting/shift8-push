@@ -41,6 +41,7 @@ function register_shift8_push_settings() {
     register_setting( 'shift8-push-settings-group', 'shift8_push_enabled' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_src_url' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_dst_url' );
+    register_setting( 'shift8-push-settings-group', 'shift8_push_application_user' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_application_password' );
 }
 
@@ -56,6 +57,7 @@ function shift8_push_uninstall_hook() {
   delete_option('shift8_push_enabled');
   delete_option('shift8_push_src_url');
   delete_option('shift8_push_dst_url');
+  delete_option('shift8_push_application_user');
   delete_option('shift8_push_application_password');
 }
 register_uninstall_hook( S8PUSH_FILE, 'shift8_push_uninstall_hook' );
@@ -86,6 +88,7 @@ function shift8_push_check_options() {
 // Used to validate whether options, plugin enable and user is admin
 function shift8_push_check_validation() {
   if (!shift8_push_check_enabled()) return false;
+  if (empty(esc_attr(get_option('shift8_push_application_user')))) return false;
   if (empty(esc_attr(get_option('shift8_push_application_password')))) return false;
   if (empty(esc_attr( get_option('shift8_push_src_url')))) return false;
   if (empty(esc_attr( get_option('shift8_push_dst_url')))) return false;
