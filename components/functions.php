@@ -140,12 +140,8 @@ function shift8_push_poll($shift8_action, $item_id = null) {
                     // Wrap all metadata into array to pass separately to custom REST endpoint
                     if ($post_meta && is_array($post_meta)) {
                         foreach ($post_meta as $key => $value) {
-                            if ($key == '_fl_builder_data') {
-                                $fixed_value = shift8_push_unserialize_replace($source_url, $destination_url, $value[0]);
-                                $meta_data['meta'][$key] = $fixed_value;
-                            } else { 
-                                $meta_data['meta'][$key] = $value[0];
-                            }
+                            $fixed_value = shift8_push_recursive_unserialize_replace($source_url, $destination_url, $value[0]);
+                            $meta_data['meta'][$key] = $fixed_value;
                         }
                     }
                 }
@@ -240,43 +236,6 @@ function shift8_push_poll($shift8_action, $item_id = null) {
             }
         }
     } 
-}
-
-function shift8_push_unserialize_replace( $old_url = '', $new_url = '', $database_string = '' ) {
-    if ( substr( $old_url, -1 ) !== '/' ) {
-        $new_url = rtrim( $new_url, '/' );
-    }
-
-    $serialized_arrays = preg_match_all( "/a:\d+:.*\;\}+/", $database_string, $matches );
-
-    if( !empty( $serialized_arrays ) && is_array( $matches ) ) {
-        foreach ( $matches[ 0 ] as $match ) {
-            $unserialized = @unserialize( $match );
-
-            if ( $unserialized ) {
-                $buffer = str_replace( $old_url, $new_url, $unserialized );
-                $buffer = serialize( $buffer );
-
-                $database_string = str_replace( $match, $buffer, $database_string );
-            }
-        }
-    }
-
-    if ( is_string( $database_string ) ) {
-        $database_string = str_replace( $old_url, $new_url, $database_string );
-    }
-
-    if ( @unserialize($database_string) !== true &&  preg_match('/^[aOs]:/', $database_string) ) {
-            $database_string = preg_replace_callback( '/s\:(\d+)\:\"(.*?)\";/s',    function($matches){return 's:'.strlen($matches[2]).':"'.$matches[2].'";'; },   $database_string );
-        }
-
-    return $database_string;
-}
-
-function shift8_push_replace_url(&$element, $index){
-    $destination_url = esc_attr(get_option('shift8_push_dst_url'));
-    $source_url = esc_attr(get_option('shift8_push_src_url'));
-    $element = str_replace($source_url, $destination_url, $element);
 }
 
 // Functions to produce debugging information
@@ -444,13 +403,13 @@ function shift8_push_recursive_unserialize_replace( $from = '', $to = '', $data 
     try {
 
         if ( is_string( $data ) && ( $unserialized = @unserialize( $data ) ) !== false ) {
-            $data = recursive_unserialize_replace( $from, $to, $unserialized, true );
+            $data = shift8_push_recursive_unserialize_replace( $from, $to, $unserialized, true );
         }
 
         elseif ( is_array( $data ) ) {
             $_tmp = array( );
             foreach ( $data as $key => $value ) {
-                $_tmp[ $key ] = recursive_unserialize_replace( $from, $to, $value, false );
+                $_tmp[ $key ] = shift8_push_recursive_unserialize_replace( $from, $to, $value, false );
             }
 
             $data = $_tmp;
