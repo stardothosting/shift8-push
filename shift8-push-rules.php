@@ -20,3 +20,6 @@ if ( !defined( 'S8PUSH_APIBASE' ) )
 
 if ( !defined( 'S8PUSH_APICUSTOM' ) )
     define ( 'S8PUSH_APICUSTOM', '/wp-json/shift8/v1/' );
+
+if ( !defined( 'S8PUSH_POSTTYPES' ) )
+    define ( 'S8PUSH_POSTTYPES', array( 'page', 'post', 'traffick-stop' ) );

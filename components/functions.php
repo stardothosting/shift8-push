@@ -116,7 +116,8 @@ function shift8_push_poll($shift8_action, $item_id = null) {
             $post_type = null;
             if ( $item_id && get_post_type( $item_id ) == 'post' ) $post_type = 'posts';
             if ( $item_id && get_post_type( $item_id ) == 'page' ) $post_type = 'pages';
-
+            if ( $item_id && get_post_type( $item_id ) == 'traffick-stop' ) $post_type = 'traffick-stop';
+            
             // Only continue if we are dealing with posts or pages
             if ($post_type) {
 
@@ -324,6 +325,16 @@ function shift8_push_create_api_posts_meta_field() {
             'update_callback' => 'shift8_push_update_post_meta_for_api',
             )
         );
+    }
+    // Traffick stop
+    if (post_type_exists('traffick-stop')) {
+        $traffick_meta_keys = shift8_push_generate_meta_keys('traffick-stop');
+        foreach ($page_meta_keys as $page_meta_key) {
+            register_rest_field( 'traffick-stop', $page_meta_key, array(
+                'update_callback' => 'shift8_push_update_post_meta_for_api',
+                )
+            );
+        }
     }
 }
 

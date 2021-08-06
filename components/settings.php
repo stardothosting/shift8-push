@@ -117,10 +117,14 @@ add_action( 'post_submitbox_misc_actions', 'shift8_push_button' );
 function shift8_push_button(){
   if (shift8_push_check_validation()) {
     $item_id = get_the_ID();
-    $html = '<div class="shift8-push-button-container">';
-    $html .= '<a id="shift8-push-trigger" href="' . wp_nonce_url( admin_url('admin-ajax.php?action=shift8_push_push&item_id=' . $item_id), 'process') . '"><button class="shift8-push-button shift8-push-button-check">Push to Prod</button></a>';
-    $html .= '<div class="shift8-push-spinner"></div>';
-    $html .= '</div>';
-    echo $html;
+    $post_type = get_post_type($item_id);
+    // Show button on specific post types
+    if ($post_type && in_array($post_type, S8PUSH_POSTTYPES)) {
+      $html = '<div class="shift8-push-button-container">';
+      $html .= '<a id="shift8-push-trigger" href="' . wp_nonce_url( admin_url('admin-ajax.php?action=shift8_push_push&item_id=' . $item_id), 'process') . '"><button class="shift8-push-button shift8-push-button-check">Push to Prod</button></a>';
+      $html .= '<div class="shift8-push-spinner"></div>';
+      $html .= '</div>';
+      echo $html;
+    }
   }
 }
