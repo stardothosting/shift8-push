@@ -1,6 +1,6 @@
 <?php
 /**
- * Shift8 Zoom Main Functions
+ * Shift8 Push Main Functions
  *
  * Collection of functions used throughout the operation of the plugin
  *
@@ -54,7 +54,7 @@ function shift8_push_push() {
         die();
     // Push 
     } else if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'push' && is_numeric($_GET['item_id'])) {
-        $item_id = $_GET['item_id'];
+        $item_id = sanitize_text_field($_GET['item_id']);
         shift8_push_poll('push', $item_id);
         die();
     } else {
@@ -251,7 +251,7 @@ function shift8_push_debug_get_php_info() {
         ob_end_clean();
 
         $pinfo = preg_replace( '%^.*<body>(.*)</body>.*$%ms','$1',$pinfo);
-        echo $pinfo;
+        echo esc_html($pinfo);
     }
 }
 
@@ -300,12 +300,12 @@ function shift8_push_debug_version_check() {
     $themeauth      = $theme->get( 'Author' ) . ' - ' . $theme->get( 'AuthorURI' );
     $uri            = $theme->get( 'ThemeURI' );
 
-    echo '<strong>' . __( 'WordPress Version: ' ) . '</strong>' . $wp . '<br />';
-    echo '<strong>' . __( 'Current WordPress Theme: ' ) . '</strong>' . $themeversion . '<br />';
-    echo '<strong>' . __( 'Theme Author: ' ) . '</strong>' . $themeauth . '<br />';
-    echo '<strong>' . __( 'Theme URI: ' ) . '</strong>' . $uri . '<br />';
-    echo '<strong>' . __( 'PHP Version: ' ) . '</strong>' . $php . '<br />';
-    echo '<strong>' . __( 'Active Plugins: ' ) . '</strong>' . $plugins . '<br />';
+    echo '<strong>' . __( 'WordPress Version: ' ) . '</strong>' . esc_html($wp) . '<br />';
+    echo '<strong>' . __( 'Current WordPress Theme: ' ) . '</strong>' . esc_html($themeversion) . '<br />';
+    echo '<strong>' . __( 'Theme Author: ' ) . '</strong>' . esc_html($themeauth) . '<br />';
+    echo '<strong>' . __( 'Theme URI: ' ) . '</strong>' . esc_html($uri) . '<br />';
+    echo '<strong>' . __( 'PHP Version: ' ) . '</strong>' . esc_html($php) . '<br />';
+    echo '<strong>' . __( 'Active Plugins: ' ) . '</strong>' . esc_html($plugins) . '<br />';
 }
 
 // Allow all meta fields to be updated via REST API

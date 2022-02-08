@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Shift8 Push
- * Plugin URI: n/a
+ * Plugin URI: https://github.com/stardothosting/shift8-push
  * Description: Plugin that allows you to push single posts and pages to an external site
- * Version: 0.0.1
+ * Version: 1.0.0
  * Author: Shift8 Web 
  * Author URI: https://www.shift8web.ca
  * License: GPLv3
@@ -37,7 +37,7 @@ function shift8_push_settings_page() {
 <div class="wrap">
 <h2>Shift8 Push Settings</h2>
 <?php if (is_admin()) { 
-$active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'core_settings';
+$active_tab = isset( $_GET[ 'tab' ] ) ? sanitize_text_field($_GET[ 'tab' ]) : 'core_settings';
 $plugin_data = get_plugin_data( __FILE__ );
 $plugin_name = $plugin_data['TextDomain'];
     ?>
