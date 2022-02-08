@@ -4,13 +4,11 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2
+class ComposerStaticInit1ce655c636c086243f66262b632f4162
 {
     public static $files = array (
-        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
-        '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
         'a4a119a56e50fbb293281d9a48007e0e' => __DIR__ . '/..' . '/symfony/polyfill-php80/bootstrap.php',
-        'a1105708a18b76903365ca1c4aa61b02' => __DIR__ . '/..' . '/symfony/translation/Resources/functions.php',
+        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
     );
 
     public static $prefixLengthsPsr4 = array (
@@ -20,10 +18,6 @@ class ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2
             'Symfony\\Polyfill\\Mbstring\\' => 26,
             'Symfony\\Contracts\\Translation\\' => 30,
             'Symfony\\Component\\Translation\\' => 30,
-        ),
-        'C' => 
-        array (
-            'Carbon\\' => 7,
         ),
     );
 
@@ -44,9 +38,19 @@ class ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2
         array (
             0 => __DIR__ . '/..' . '/symfony/translation',
         ),
-        'Carbon\\' => 
+    );
+
+    public static $fallbackDirsPsr4 = array (
+        0 => __DIR__ . '/..' . '/nesbot/carbon/src',
+    );
+
+    public static $prefixesPsr0 = array (
+        'U' => 
         array (
-            0 => __DIR__ . '/..' . '/nesbot/carbon/src/Carbon',
+            'UpdateHelper\\' => 
+            array (
+                0 => __DIR__ . '/..' . '/kylekatarnls/update-helper/src',
+            ),
         ),
     );
 
@@ -61,9 +65,11 @@ class ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticIniteea9aa2e305281edcbbd725a1650eab2::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit1ce655c636c086243f66262b632f4162::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit1ce655c636c086243f66262b632f4162::$prefixDirsPsr4;
+            $loader->fallbackDirsPsr4 = ComposerStaticInit1ce655c636c086243f66262b632f4162::$fallbackDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit1ce655c636c086243f66262b632f4162::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInit1ce655c636c086243f66262b632f4162::$classMap;
 
         }, null, ClassLoader::class);
     }
