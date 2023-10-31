@@ -1,6 +1,6 @@
 <?php
 /**
- * Shift8 Zoom Main Functions
+ * Shift8 Push Main Functions
  *
  * Collection of functions used throughout the operation of the plugin
  *
@@ -50,11 +50,12 @@ add_action( 'wp_ajax_shift8_push_push', 'shift8_push_push' );
 function shift8_push_push() {
     // Test
     if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'check') {
-        shift8_push_poll('check');
+        shift8_push_poll('check', null);
         die();
-    // Manual import of webinars from Zoom
-    } else if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'import') {
-        shift8_push_poll('import');
+    // Push 
+    } else if ( wp_verify_nonce($_GET['_wpnonce'], 'process') && $_GET['type'] == 'push' && is_numeric($_GET['item_id'])) {
+        $item_id = sanitize_text_field($_GET['item_id']);
+        shift8_push_poll('push', $item_id);
         die();
     } else {
         die();
@@ -62,23 +63,25 @@ function shift8_push_push() {
 }
 
 // Handle the actual GET
-function shift8_push_poll($shift8_action) {
+function shift8_push_poll($shift8_action, $item_id = null) {
     if (current_user_can('administrator')) {
         global $wpdb;
         $current_user = wp_get_current_user();
 
-        $application_password = base64_encode('admin:' . shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password'))));
+        $application_password = base64_encode(esc_attr(get_option('shift8_push_application_user')) . ':' . shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password'))));
         $destination_url = esc_attr(get_option('shift8_push_dst_url'));
+        $source_url = esc_attr(get_option('shift8_push_src_url'));
 
         // Set headers for WP Remote post
         $headers = array(
             'Content-type: application/json',
             'Authorization' => 'Basic ' . $application_password,
         );
+
         // Check values with dashboard
         if ($shift8_action == 'check') {
             // Use WP Remote Get to poll the zoom api 
-            $response = wp_remote_get( $destination_url . '/wp-json/wp/v2/' ,
+            $response = wp_remote_get( $destination_url . S8PUSH_APIBASE ,
                 array(
                     'method' => 'GET',
                     'headers' => $headers,
@@ -105,44 +108,136 @@ function shift8_push_poll($shift8_action) {
                     echo 'unknown';
                 }
             } 
-        } else if ($shift8_action == 'import') {
-            // Use WP Remote Get to poll the zoom api 
-            $response = wp_remote_get( S8ZOOM_API . '/v2/users/' . $zoom_user_email . '/webinars' . S8ZOOM_WEBINAR_PARAMETERS,
-                array(
-                    'method' => 'GET',
-                    'headers' => $headers,
-                    'httpversion' => '1.1',
-                    'timeout' => '45',
-                    'blocking' => true,
-                )
-            );
-            // Deal with the response
-            if (is_object(json_decode($response['body']))) {
-                // Populate options from response if its a check
-                if ($shift8_action == 'import') {         
-                    $webinar_data = json_decode($response['body'], true);
-                    $webinars_imported = shift8_push_import_webinars($webinar_data);
-                    echo json_encode(array(
-                        'total_records' => esc_attr(json_decode($response['body'])->total_records),
-                        'webinar_data' => json_encode(json_decode($response['body'])->webinars),
-                        'webinars_imported' => $webinars_imported,
-                    ));   
+        } else if ($shift8_action == 'push') {
+
+
+
+            // Assign the post type based on item ID provided
+            $post_type = null;
+            if ( $item_id && get_post_type( $item_id ) == 'post' ) $post_type = 'posts';
+            if ( $item_id && get_post_type( $item_id ) == 'page' ) $post_type = 'pages';
+            if ( $item_id && get_post_type( $item_id ) == 'traffick-stop' ) $post_type = 'traffick-stop';
+
+            // Only continue if we are dealing with posts or pages
+            if ($post_type) {
+
+                // Load up the post data
+                $post_data = get_post($item_id);
+                $post_meta = get_post_meta($item_id);
+                if( $post_data ) {
+                    // Now, form our own array
+                    $data = array();
+                    $meta_data = array();
+                    $data['date'] = $post_data->post_date;
+                    $data['date_gmt'] = $post_data->post_date_gmt;
+                    $data['guid'] = $post_data->guid;
+                    $data['modified'] = $post_data->post_modified;
+                    $data['modified_gmt'] = $post_data->post_modified_gmt;
+                    $data['slug'] = $post_data->post_name;
+                    $data['status'] = $post_data->post_status;
+                    $data['title'] = $post_data->post_title;
+                    $data['content'] = str_replace($source_url, $destination_url, $post_data->post_content);
+                    $data['excerpt'] = $post_data->post_excerpt;
+                    // Wrap all metadata into array to pass separately to custom REST endpoint
+                    if ($post_meta && is_array($post_meta)) {
+                        foreach ($post_meta as $key => $value) {
+                            $fixed_value = shift8_push_recursive_unserialize_replace($source_url, $destination_url, $value[0]);
+                            $meta_data['meta'][$key] = $fixed_value;
+                        }
+                    }
                 }
 
-            } else {
-                echo 'Error Detected : ';
-                if (is_array($response['response'])) {
-                    echo esc_attr(json_decode($response['body'])->error);
+                // Check if post exists
+                $check_exists = wp_remote_get( $destination_url . S8PUSH_APIBASE . $post_type . '?slug=' . $post_data->post_name,
+                    array(
+                        'method' => 'GET',
+                        'headers' => $headers,
+                        'httpversion' => '1.1',
+                        'timeout' => '45',
+                        'blocking' => true,
+                    )
+                );
 
+                $check_object = json_decode($check_exists['body']);
+
+                // If we found an existing post with slug match
+                if (count($check_object) > 0) {
+                    $destination_id = esc_attr($check_object[0]->id);
+                    $api_response = wp_remote_post( $destination_url . S8PUSH_APIBASE . $post_type . '/' . $destination_id . '/',
+                        array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $data,
+                            'data_format' => 'body',
+                        )
+                    );
+                    $body = json_decode( $api_response['body'] );
+                    if( wp_remote_retrieve_response_message( $api_response ) === 'OK' ) {
+                        $meta_data['id'] = $destination_id;
+                        $meta_api_response = wp_remote_post( $destination_url . S8PUSH_APICUSTOM . 'meta/', array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $meta_data,
+                            'data_format' => 'body',
+                            )
+                        );
+                       $meta_body = json_decode( $meta_api_response['body'] );
+                       echo json_encode(array(
+                            'message' => 'The post ' . $body->title->rendered . ' has been updated successfully',
+                        ));
+                    } else {
+                        echo json_encode(array(
+                            'message' => 'error with api response for meta push update',
+                        ));
+                    }
+
+                // IF nothing found, create new post on destination
                 } else {
-                    echo 'unknown';
+                   $api_response = wp_remote_post( $destination_url . S8PUSH_APIBASE . $post_type,
+                        array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $data,
+                            'data_format' => 'body',
+                        )
+                    );
+                    $body = json_decode( $api_response['body'] );
+                    if( wp_remote_retrieve_response_message( $api_response ) === 'Created' ) {
+                        $meta_data['id'] = $body->id;
+                        $meta_api_response = wp_remote_post( $destination_url . S8PUSH_APICUSTOM . 'meta/',                       array(
+                            'method' => 'POST',
+                            'headers' => $headers,
+                            'httpversion' => '1.1',
+                            'timeout' => '45',
+                            'blocking' => true,
+                            'body' => $meta_data,
+                            'data_format' => 'body',
+                            )
+                        );
+                       $meta_body = json_decode( $meta_api_response['body'] );
+                       echo json_encode(array(
+                            'message' => 'The post ' . $body->title->rendered . ' has been created successfully : ' . $meta_data['id'],
+                        ));
+                    } else {
+                        echo json_encode(array(
+                            'message' => 'error with api response for meta push create : ' . $meta_data['id'],
+                        ));
+                    }
                 }
+
             }
         }
     } 
 }
-
-
 
 // Functions to produce debugging information
 function shift8_push_debug_get_php_info() {
@@ -156,7 +251,7 @@ function shift8_push_debug_get_php_info() {
         ob_end_clean();
 
         $pinfo = preg_replace( '%^.*<body>(.*)</body>.*$%ms','$1',$pinfo);
-        echo $pinfo;
+        echo esc_html($pinfo);
     }
 }
 
@@ -205,236 +300,145 @@ function shift8_push_debug_version_check() {
     $themeauth      = $theme->get( 'Author' ) . ' - ' . $theme->get( 'AuthorURI' );
     $uri            = $theme->get( 'ThemeURI' );
 
-    echo '<strong>' . __( 'WordPress Version: ' ) . '</strong>' . $wp . '<br />';
-    echo '<strong>' . __( 'Current WordPress Theme: ' ) . '</strong>' . $themeversion . '<br />';
-    echo '<strong>' . __( 'Theme Author: ' ) . '</strong>' . $themeauth . '<br />';
-    echo '<strong>' . __( 'Theme URI: ' ) . '</strong>' . $uri . '<br />';
-    echo '<strong>' . __( 'PHP Version: ' ) . '</strong>' . $php . '<br />';
-    echo '<strong>' . __( 'Active Plugins: ' ) . '</strong>' . $plugins . '<br />';
+    echo '<strong>' . __( 'WordPress Version: ' ) . '</strong>' . esc_html($wp) . '<br />';
+    echo '<strong>' . __( 'Current WordPress Theme: ' ) . '</strong>' . esc_html($themeversion) . '<br />';
+    echo '<strong>' . __( 'Theme Author: ' ) . '</strong>' . esc_html($themeauth) . '<br />';
+    echo '<strong>' . __( 'Theme URI: ' ) . '</strong>' . esc_html($uri) . '<br />';
+    echo '<strong>' . __( 'PHP Version: ' ) . '</strong>' . esc_html($php) . '<br />';
+    echo '<strong>' . __( 'Active Plugins: ' ) . '</strong>' . esc_html($plugins) . '<br />';
 }
 
-// Function to schedule cron polling interval to import Zoom webinars
+// Allow all meta fields to be updated via REST API
+add_action( 'rest_api_init', 'shift8_push_create_api_posts_meta_field' );
 
-// Check user plan options
-add_action( 'shift8_push_cron_hook', 'shift8_push_check' );
-function shift8_push_check() {
-    $zoom_jwt_token = shift8_push_generate_jwt();
-    $zoom_user_email = sanitize_email(get_option('shift8_push_user_email'));
-
-     // Set headers for WP Remote post
-    $headers = array(
-        'Content-type: application/json',
-        'Authorization' => 'Bearer ' . $zoom_jwt_token,
-    );
-
-    // Use WP Remote Get to poll the zoom api 
-    $response = wp_remote_get( S8ZOOM_API . '/v2/users/' . $zoom_user_email . '/webinars' . S8ZOOM_WEBINAR_PARAMETERS,
-        array(
-            'method' => 'GET',
-            'headers' => $headers,
-            'httpversion' => '1.1',
-            'timeout' => '45',
-            'blocking' => true,
-        )
-    );
-    // Deal with the response
-    if (is_object(json_decode($response['body']))) {
-        // Pass the returned webinars to a function to handle the import
-        $webinar_data = json_decode($response['body'], true);
-        $webinars_imported = shift8_push_import_webinars($webinar_data);
-    } else {
-        echo 'Error Detected : ';
-        if (is_array($response['response'])) {
-            echo esc_attr(json_decode($response['body'])->error);
-
-        } else {
-            echo 'unknown';
+function shift8_push_create_api_posts_meta_field() {
+    $page_meta_keys = shift8_push_generate_meta_keys('page');
+    $post_meta_keys = shift8_push_generate_meta_keys('post');
+    foreach ($page_meta_keys as $page_meta_key) {
+        register_rest_field( 'page', $page_meta_key, array(
+            'update_callback' => 'shift8_push_update_post_meta_for_api',
+            )
+        );
+    }
+    foreach ($post_meta_keys as $post_meta_key) {
+        register_rest_field( 'post', $post_meta_key, array(
+            'update_callback' => 'shift8_push_update_post_meta_for_api',
+            )
+        );
+    }
+    // Traffick stop
+    if (post_type_exists('traffick-stop')) {
+        $traffick_meta_keys = shift8_push_generate_meta_keys('traffick-stop');
+        foreach ($page_meta_keys as $page_meta_key) {
+            register_rest_field( 'traffick-stop', $page_meta_key, array(
+                'update_callback' => 'shift8_push_update_post_meta_for_api',
+                )
+            );
         }
     }
 }
 
-// Custom Cron schedules outside of default WP Cron
-add_filter( 'cron_schedules', 'shift8_push_add_cron_interval' );
-function shift8_push_add_cron_interval( $schedules ) { 
-    $schedules['shift8_push_minute'] = array(
-        'interval' => 60,
-        'display'  => esc_html__( 'Every Sixty Seconds' ), );
-    $schedules['shift8_push_halfhour'] = array(
-        'interval' => 1800,
-        'display'  => esc_html__( 'Every 30 minutes' ), );
-    $schedules['shift8_push_twohour'] = array(
-        'interval' => 7200,
-        'display'  => esc_html__( 'Every two hours' ), );
-    $schedules['shift8_push_fourhour'] = array(
-        'interval' => 14400,
-        'display'  => esc_html__( 'Every four hours' ), );
-    return $schedules;
-}
-
-// Set the cron task on an hourly basis to check the zoom suffix, only if enabled and all fields populated
-if (shift8_push_check_enabled()) {
-    if ( ! wp_next_scheduled( 'shift8_push_cron_hook' ) ) {
-        wp_schedule_event( time(), esc_attr(get_option('shift8_push_import_frequency')), 'shift8_push_cron_hook' );
-    } 
-} else {
-    wp_clear_scheduled_hook( 'shift8_push_cron_hook' );
-}
-
-shift8_push_write_log(wp_next_scheduled( 'shift8_push_cron_hook' ) );
-
-// Generate JWT Token 
-function shift8_push_generate_jwt() {
-    $key = esc_attr(get_option('shift8_push_api_key'));
-    $secret = esc_attr(get_option('shift8_push_api_secret'));
-    $header = array(
-        'typ' => 'JWT', 
-        'alg' => 'HS256'
-    );
-    $payload = array(
-        "iss" => $key,
-        "exp" => 1496091964000,
-    );
-    $jwt = JWT::encode($payload, $secret);
-    return $jwt;
-}
-// Build 
-function shift8_push_get_import_frequency_options() {
-    $import_frequency = array(
-        //'shift8_push_minute' => 'Every minute',
-        'hourly' => 'Hourly',
-        'twicedaily' => 'Twice Daily',
-        'daily' => 'Daily',
-        'weekly' => 'Weekly'
-    );
-    return $import_frequency;
-}
-
-
-// Function to import webinar data
-function shift8_push_import_webinars($webinar_data) {
-    // Import counter
-    $import_count = 0;
-    // Obtain the title import filter
-    $import_filter = (empty(esc_attr(get_option('shift8_push_filter_title'))) ? false : esc_attr(get_option('shift8_push_filter_title')));
-
-    // WPML Force import to be english as the language is set manually
-    if ( function_exists('icl_object_id') ) {
-        global $sitepress; 
-        $lang='en';
-        $sitepress->switch_lang($lang);
+function shift8_push_update_post_meta_for_api( $value, $object, $field_name ) {
+    if ( ! $value ) {
+        return;
     }
+    return update_post_meta( $object->ID, $field_name, $value );
+}
 
-    if (is_array($webinar_data) && $webinar_data['webinars']) {
-        foreach ($webinar_data['webinars'] as $webinar) {
-            // If the filter is present and a match is found in the title, skip
-            if ($import_filter && preg_match("/" . $import_filter . "/i", $webinar['topic'])) {
-                continue;
-            } else {
-                // Check if the UUID exists already
-                $args = array(  
-                    'post_type' => 'shift8_push',
-                    'post_status' => 'publish',
-                    'posts_per_page' => -1,
-                    'suppress_filters' => true,
-                    'meta_query'     => array(
-                        array(
-                            'key'       => '_post_shift8_push_id',
-                            'value'     => sanitize_text_field($webinar['id']),
-                            'compare'   => '='
-                        )
-                    ),
-                    'order' => 'ASC', 
+function shift8_push_generate_meta_keys($post_type){
+    global $wpdb;
+    $query = "
+        SELECT DISTINCT($wpdb->postmeta.meta_key) 
+        FROM $wpdb->posts 
+        LEFT JOIN $wpdb->postmeta 
+        ON $wpdb->posts.ID = $wpdb->postmeta.post_id 
+        WHERE $wpdb->posts.post_type = '%s' 
+        AND $wpdb->postmeta.meta_key != '_fl_builder_history_position' 
+    ";
+    $meta_keys = $wpdb->get_col($wpdb->prepare($query, esc_attr($post_type)));
+    return $meta_keys;
+}
+
+// Create custom REST endpoint for dealing with meta values
+add_action( 'rest_api_init', function () {
+        register_rest_route( 'shift8/v1', '/meta/', array(
+                'methods' => 'POST',
+                'callback' => 'shift8_push_rest_meta',
+        ) );
+} );
+
+function shift8_push_rest_meta( $request ) {
+    $post_data['id'] = $request['id'];
+    $post_data['meta'] = $request['meta'];
+
+    if ($post_data['meta'] && is_array($post_data['meta'])) {
+        $response_meta = array();
+        foreach ($post_data['meta'] as $key => $value) {
+            $update_response = update_post_meta($post_data['id'], $key, maybe_unserialize($value));
+            if (!$update_response) {
+                $response_meta[] = array(
+                    'meta_key' => $key,
+                    'meta_value' => $value,
+                    'update_response' => $update_response,
                 );
-                $query = new WP_Query ( $args );
-                // If ID exists, move on
-                if ($query->have_posts()) {
-                    continue;
-                } else {
-                    // Create post object
-                    $webinar_post = array(
-                        'post_title'    => wp_strip_all_tags( $webinar['topic'] ),
-                        'post_status'   => 'publish',
-                        'post_type'     => 'shift8_push',
-                        'post_author'   => 1,
-                        //'post_date'     => wp_date(Carbon::create(sanitize_text_field( $webinar['start_time'] ))),
-                    );
-
-                    // Have to get the agenda text separately as the list webinar api query limits it to 250 characters
-                    $webinar_data = shift8_push_webinar_data(sanitize_text_field($webinar['id']));
-                    if (!$webinar_data['agenda']) { 
-                        $webinar_data['agenda'] = shift8_push_wp_kses( $webinar['agenda'] );
-                    }
-
-                    // Adjust the start time and timezone
-                    $webinar_datetime = Carbon::create(sanitize_text_field( $webinar['start_time']))->setTimezone('UTC');
-                    $webinar_timezone = strtoupper(CarbonTimeZone::create(sanitize_text_field( $webinar['timezone'] ))->getAbbr());
-
-                    // Insert the post into the database
-                    $post_id = wp_insert_post( $webinar_post );
-                    update_post_meta( $post_id, "_post_shift8_push_uuid", sanitize_text_field( $webinar['uuid']) );
-                    update_post_meta( $post_id, "_post_shift8_push_id", sanitize_text_field( $webinar['id']) );
-                    update_post_meta( $post_id, "_post_shift8_push_type", sanitize_text_field( $webinar['type']) );
-                    update_post_meta( $post_id, "_post_shift8_push_start", wp_date($webinar_datetime->setTimezone(sanitize_text_field( $webinar['timezone'] ))) );
-                    update_post_meta( $post_id, "_post_shift8_push_duration", sanitize_text_field( $webinar['duration'] ) );
-                    update_post_meta( $post_id, "_post_shift8_push_timezone", sanitize_text_field( $webinar_timezone ) );
-                    update_post_meta( $post_id, "_post_shift8_push_joinurl", $webinar_data['registration_url'] );
-                    update_post_meta( $post_id, "_post_shift8_push_agenda_html", $webinar_data['agenda'] );
-                    $import_count++;
-                }
             }
-        }      
+        }
     }
-    return $import_count;
+    return array(
+        'update_response' => true,
+        'message' => 'Post meta update succeeded for ID ' . $post_data['id'],
+        'post_data' => $post_data,
+    );
 }
 
-// Get the agenda info because it is truncated in the agenda list API query
-function shift8_push_webinar_data($webinar_id) {
-    $zoom_jwt_token = shift8_push_generate_jwt();
-
-     // Set headers for WP Remote post
-    $headers = array(
-        'Content-type: application/json',
-        'Authorization' => 'Bearer ' . $zoom_jwt_token,
-    );
-
-    // Use WP Remote Get to poll the zoom api 
-    $response = wp_remote_get( S8ZOOM_API . '/v2/webinars/' . intval($webinar_id),
-        array(
-            'method' => 'GET',
-            'headers' => $headers,
-            'httpversion' => '1.1',
-            'timeout' => '45',
-            'blocking' => true,
-        )
-    );
-    // Deal with the response
-    if (is_object(json_decode($response['body']))) {
-        // Pass the returned webinars to a function to handle the import
-        return array(
-            'agenda' => shift8_push_wp_kses(json_decode($response['body'])->agenda),
-            'registration_url' => sanitize_url(json_decode($response['body'])->registration_url),
-        );
-
+function shift8_push_recursive_array_replace( $find, $replace, $data ) {
+    if ( is_array( $data ) ) {
+        foreach ( $data as $key => $value ) {
+            if ( is_array( $value ) ) {
+                recursive_array_replace( $find, $replace, $data[ $key ] );
+            } else {
+                // have to check if it's string to ensure no switching to string for booleans/numbers/nulls - don't need any nasty conversions
+                if ( is_string( $value ) )
+                    $data[ $key ] = str_replace( $find, $replace, $value );
+            }
+        }
     } else {
-        return false;
+        if ( is_string( $data ) )
+            $data = str_replace( $find, $replace, $data );
     }
 }
 
-// Centralized function to filter HTML, specifically for the agenda details
-function shift8_push_wp_kses($string) {
-    $allowed_html = array(
-        'a' => array(
-            'href' => array(),
-            'title' => array()
-        ),
-        'br' => array(),
-        'em' => array(),
-        'strong' => array(),
-        'ul' => array(),
-        'li' => array(),
-        'ol' => array(),
-        'b' => array(),
-        'p' => array(),
-    );
-    return wp_kses($string, $allowed_html);
+function shift8_push_recursive_unserialize_replace( $from = '', $to = '', $data = '', $serialised = false ) {
+
+    // some unseriliased data cannot be re-serialised eg. SimpleXMLElements
+    try {
+
+        if ( is_string( $data ) && ( $unserialized = @unserialize( $data ) ) !== false ) {
+            $data = shift8_push_recursive_unserialize_replace( $from, $to, $unserialized, true );
+        }
+
+        elseif ( is_array( $data ) ) {
+            $_tmp = array( );
+            foreach ( $data as $key => $value ) {
+                $_tmp[ $key ] = shift8_push_recursive_unserialize_replace( $from, $to, $value, false );
+            }
+
+            $data = $_tmp;
+            unset( $_tmp );
+        }
+
+        else {
+            if ( is_string( $data ) )
+                $data = str_replace( $from, $to, $data );
+        }
+
+        if ( $serialised )
+            return serialize( $data );
+
+    } catch( Exception $error ) {
+
+    }
+
+    return $data;
 }
+

@@ -12,8 +12,8 @@ This is a plugin that pushes a single post or page to an external site via the R
 
 == Instructions for setup ==
 
-1. Generate API keys on the destination server
-2. Setup plugin on your source server and configure API keys
+1. Generate core Wordpress application user & password on the destination server. You can follow the official Wordpress [instructions for generating an application password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/).
+2. Setup plugin on your source server and configure application user & password
 3. When editing a single post or page, a "Push" button will appear to push the changes to the server.
 
 == Want to see the plugin in action? ==
@@ -51,8 +51,9 @@ Visit the support forums here and let us know. We will try our best to help!
 = 0.0.1 =
 * Plugin created
 
-= 0.1.0 = 
+= 0.1.0 =
 * Wordpress 6.3 compatibility
 
 = 1.0.1 =
 * Wordpress update
+

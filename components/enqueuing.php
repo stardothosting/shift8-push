@@ -14,7 +14,7 @@ if ( !defined( 'ABSPATH' ) ) {
 function load_shift8_push_wp_admin_style() {
         // admin always last
         wp_enqueue_style( 'shift8_push_css', plugin_dir_url(dirname(__FILE__)) . 'css/shift8_push_admin.css', array(), '0.0.2' );
-        wp_enqueue_script( 'shift8_push_script', plugin_dir_url(dirname(__FILE__)) . 'js/shift8_push_admin.js', array(), '0.0.2' );
+        wp_enqueue_script( 'shift8_push_script', plugin_dir_url(dirname(__FILE__)) . 'js/shift8_push_admin.js', array(), '0.0.17' );
 
         wp_localize_script( 'shift8_push_script', 'the_ajax_script', array( 
             'ajaxurl' => admin_url( 'admin-ajax.php' ),

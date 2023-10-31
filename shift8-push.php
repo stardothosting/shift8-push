@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Shift8 Push
- * Plugin URI: n/a
+ * Plugin URI: https://github.com/stardothosting/shift8-push
  * Description: Plugin that allows you to push single posts and pages to an external site
  * Version: 1.0.1
  * Author: Shift8 Web 
@@ -37,7 +37,7 @@ function shift8_push_settings_page() {
 <div class="wrap">
 <h2>Shift8 Push Settings</h2>
 <?php if (is_admin()) { 
-$active_tab = isset( $_GET[ 'tab' ] ) ? $_GET[ 'tab' ] : 'core_settings';
+$active_tab = isset( $_GET[ 'tab' ] ) ? sanitize_text_field($_GET[ 'tab' ]) : 'core_settings';
 $plugin_data = get_plugin_data( __FILE__ );
 $plugin_name = $plugin_data['TextDomain'];
     ?>
@@ -64,8 +64,6 @@ $plugin_name = $plugin_data['TextDomain'];
     <tbody class="<?php echo $active_tab == 'core_settings' ? 'shift8-push-admin-tab-active' : 'shift8-push-admin-tab-inactive'; ?>">
 	<tr valign="top">
     <th scope="row">Core Settings</th>
-    <?php var_dump(base64_encode('administrator:' .  shift8_push_decrypt(get_option('shift8_push_application_password')))); 
-    var_dump(shift8_push_decrypt(get_option('shift8_push_application_password'))); ?>
     <td><span id="shift8-push-notice">
     <?php 
     settings_errors('shift8_push_url');
@@ -109,6 +107,14 @@ $plugin_name = $plugin_data['TextDomain'];
     </div>
     </td>
     </tr>
+    <tr valign="top">
+    <th scope="row">Shift8 Push Application User : </th>
+    <td><input type="text" id="shift8_push_application_user" name="shift8_push_application_user" size="34" value="<?php echo (empty(esc_attr(get_option('shift8_push_application_user'))) ? '' : esc_attr(get_option('shift8_push_application_user'))); ?>">
+    <div class="shift8-push-tooltip"><span class="dashicons dashicons-editor-help"></span>
+        <span class="shift8-push-tooltiptext">This is the user that the application password belongs, generated on the production site.</span>
+    </div>
+    </td>
+    </tr>
 	<tr valign="top">
     <th scope="row">Shift8 Push Application Password : </th>
     <td><input type="password" id="shift8_push_application_password" name="shift8_push_application_password" size="34" value="<?php echo (empty(esc_attr(get_option('shift8_push_application_password'))) ? '' : shift8_push_decrypt(esc_attr(get_option('shift8_push_application_password')))); ?>">
@@ -120,11 +126,11 @@ $plugin_name = $plugin_data['TextDomain'];
     <tr valign="top">
     <td width="226px"><div class="shift8-push-spinner"></div></td>
     <td>
-    <?php if (empty(esc_attr(get_option('shift8_push_application_password')))) { ?>
-    <div class="shift8-push-prereg-note">Note : You need to register an application password from the production site first to get the above values. Once you save the application password, a check button will appear.</div>
+    <?php if (empty(esc_attr(get_option('shift8_push_application_password'))) || empty(esc_attr(get_option('shift8_push_application_user'))) ) { ?>
+    <div class="shift8-push-prereg-note">Note : You need to register an application password for your user from the production site first to get the above values. Once you save the application password, a check button will appear.</div>
     <?php } ?>
     <ul class="shift8-push-controls">
-    <?php if (!empty(esc_attr(get_option('shift8_push_application_password')))) { ?>
+    <?php if (!empty(esc_attr(get_option('shift8_push_application_password'))) && !empty(esc_attr(get_option('shift8_push_application_user')))) { ?>
     <li>
     <div class="shift8-push-button-container">
     <a id="shift8-push-check" href="<?php echo wp_nonce_url( admin_url('admin-ajax.php?action=shift8_push_push'), 'process'); ?>"><button class="shift8-push-button shift8-push-button-check">Test</button></a>
@@ -147,7 +153,7 @@ $plugin_name = $plugin_data['TextDomain'];
     <strong>Debug Info</strong><br /><br />
     Providing the debug information below to the Shift8 zoom support team may be helpful in them assisting in diagnosing any issues you may be having. <br /><br />
     <div class="shift8-push-button-container">
-    </div><button class="shift8-push-button shift8-push-button-copyclipboard" id="button1" onclick="Shift8ZoomCopyToClipboard('shift8zoom-debug')">Copy info below to clipboard</button>
+    </div><button class="shift8-push-button shift8-push-button-copyclipboard" id="button1" onclick="Shift8PushCopyToClipboard('shift8push-debug')">Copy info below to clipboard</button>
     <br /><br />
     <script type="text/javascript">
         function showDetails(id) {

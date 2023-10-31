@@ -41,6 +41,7 @@ function register_shift8_push_settings() {
     register_setting( 'shift8-push-settings-group', 'shift8_push_enabled' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_src_url' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_dst_url' );
+    register_setting( 'shift8-push-settings-group', 'shift8_push_application_user' );
     register_setting( 'shift8-push-settings-group', 'shift8_push_application_password' );
 }
 
@@ -56,6 +57,7 @@ function shift8_push_uninstall_hook() {
   delete_option('shift8_push_enabled');
   delete_option('shift8_push_src_url');
   delete_option('shift8_push_dst_url');
+  delete_option('shift8_push_application_user');
   delete_option('shift8_push_application_password');
 }
 register_uninstall_hook( S8PUSH_FILE, 'shift8_push_uninstall_hook' );
@@ -83,6 +85,21 @@ function shift8_push_check_options() {
   return $shift8_options;
 }
 
+// Used to validate whether options, plugin enable and user is admin
+function shift8_push_check_validation() {
+  if (!shift8_push_check_enabled()) return false;
+  if (empty(esc_attr(get_option('shift8_push_application_user')))) return false;
+  if (empty(esc_attr(get_option('shift8_push_application_password')))) return false;
+  if (empty(esc_attr( get_option('shift8_push_src_url')))) return false;
+  if (empty(esc_attr( get_option('shift8_push_dst_url')))) return false;
+  // If we are on the destination server, return false
+  if (parse_url(esc_attr( get_option('shift8_push_dst_url')), PHP_URL_HOST) == 
+    parse_url(get_site_url(), PHP_URL_HOST)) return false;
+  if (!is_admin()) return false;
+
+  return true;
+
+}
 // Trigger function when application password is updated to encrypt it properly
 add_action('init', 'shift8_push_init');
 function shift8_push_init() {
@@ -96,4 +113,21 @@ function shift8_push_update_application_password($new_value, $old_value) {
     return $new_value;
   }
   return shift8_push_encrypt($current_value);
+}
+
+add_action( 'post_submitbox_misc_actions', 'shift8_push_button' );
+
+function shift8_push_button(){
+  if (shift8_push_check_validation()) {
+    $item_id = get_the_ID();
+    $post_type = get_post_type($item_id);
+    // Show button on specific post types
+    if ($post_type && in_array($post_type, S8PUSH_POSTTYPES)) {
+      $html = '<div class="shift8-push-button-container">';
+      $html .= '<a id="shift8-push-trigger" href="' . wp_nonce_url( admin_url('admin-ajax.php?action=shift8_push_push&item_id=' . $item_id), 'process') . '"><button class="shift8-push-button shift8-push-button-check">Push to Prod</button></a>';
+      $html .= '<div class="shift8-push-spinner"></div>';
+      $html .= '</div>';
+      echo $html;
+    }
+  }
 }
