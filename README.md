@@ -3,8 +3,8 @@
 * Donate link: https://www.shift8web.ca
 * Tags: push, staging, production, content
 * Requires at least: 3.0.1
-* Tested up to: 5.6
-* Stable tag: 0.0.1
+* Tested up to: 6.3
+* Stable tag: 0.1.0
 * License: GPLv3
 * License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -50,3 +50,6 @@ Visit the support forums here and let us know. We will try our best to help!
 
 ### 0.0.1
 * Plugin created
+
+### 0.1.0
+* Wordpress 6.3 compatibility 

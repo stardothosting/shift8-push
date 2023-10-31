@@ -3,7 +3,7 @@
  * Plugin Name: Shift8 Push
  * Plugin URI: n/a
  * Description: Plugin that allows you to push single posts and pages to an external site
- * Version: 0.0.1
+ * Version: 0.1.0
  * Author: Shift8 Web 
  * Author URI: https://www.shift8web.ca
  * License: GPLv3
