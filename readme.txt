@@ -4,7 +4,7 @@
 * Tags: push, staging, production, content
 * Requires at least: 3.0.1
 * Tested up to: 6.3
-* Stable tag: 0.1.0
+* Stable tag: 1.0.1
 * License: GPLv3
 * License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -53,3 +53,6 @@ Visit the support forums here and let us know. We will try our best to help!
 
 = 0.1.0 = 
 * Wordpress 6.3 compatibility
+
+= 1.0.1 =
+* Wordpress update
